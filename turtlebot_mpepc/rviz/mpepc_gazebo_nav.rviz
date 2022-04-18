@@ -6,10 +6,12 @@ Panels:
       Expanded:
         - /TF1/Frames1
         - /TF1/Tree1
+        - /Local Planning1
         - /Local Planning1/Costmap1
         - /Local Planning1/PoseArray(local)1
         - /Global Planning1
         - /Global Planning1/Navigation CostMap1
+        - /Marker1
       Splitter Ratio: 0.5
     Tree Height: 793
   - Class: rviz/Selection
@@ -29,7 +31,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: LaserScan (kinect)
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -264,12 +266,12 @@ Visualization Manager:
           Class: rviz/Map
           Color Scheme: costmap
           Draw Behind: false
-          Enabled: true
+          Enabled: false
           Name: Costmap
           Topic: /move_base/local_costmap/costmap
           Unreliable: false
           Use Timestamp: false
-          Value: true
+          Value: false
         - Alpha: 1
           Arrow Length: 0.30000001192092896
           Axes Length: 0.30000001192092896
@@ -507,7 +509,15 @@ Visualization Manager:
       Marker Topic: /move_base/MpepcPlannerROS/mpepc_traj_sample
       Name: MarkerArray
       Namespaces:
-        {}
+        Mpepc_sample: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /move_base/MpepcPlannerROS/nn_sample
+      Name: Marker
+      Namespaces:
+        nn_sample: true
       Queue Size: 100
       Value: true
   Enabled: true

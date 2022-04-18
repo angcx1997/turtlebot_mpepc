@@ -124,6 +124,27 @@ namespace mpepc_local_planner
           potential_topic, 1, &MpepcPlannerROS::nav_cost_cb, this);
       pub_traj_sample_ = private_nh.advertise<visualization_msgs::MarkerArray>(
           "mpepc_traj_sample", 1000);
+      pub_nn = private_nh.advertise<visualization_msgs::Marker>(
+          "nn_sample", 1000);
+
+      nnArray.header.frame_id = "map";
+      nnArray.id = 0;
+      nnArray.ns = "nn_sample";
+      // nnArray.id = trajectory_count;
+      nnArray.action = visualization_msgs::Marker::ADD;
+      nnArray.type = visualization_msgs::Marker::SPHERE_LIST;
+      nnArray.color.a = 1;
+      nnArray.color.g = 1;
+      nnArray.scale.x = 0.05;
+      nnArray.scale.y = 0.1;
+      nnArray.scale.z = 0.1;
+      nnArray.pose.position.x = 0.0;
+      nnArray.pose.position.y = 0.0;
+      nnArray.pose.position.z = 0.0;
+      nnArray.pose.orientation.x = 0.0;
+      nnArray.pose.orientation.y = 0.0;
+      nnArray.pose.orientation.z = 0.0;
+      nnArray.pose.orientation.w = 1.0;
 
       dsrv_ = new dynamic_reconfigure::Server<MPEPCPlannerConfig>(private_nh);
       dynamic_reconfigure::Server<MPEPCPlannerConfig>::CallbackType cb =
@@ -214,7 +235,10 @@ namespace mpepc_local_planner
       }
 
       pub_traj_sample_.publish(trajectArray);
+      pub_nn.publish(nnArray);
       trajectArray.markers.clear();
+      nnArray.points.clear();
+      nnArray.colors.clear();
       l_plan_pub_.publish(get_trajectory_viz(new_coords));
       rate_obj.sleep();
 
@@ -745,13 +769,52 @@ namespace mpepc_local_planner
              atan2(cost_map.cells[min_i].y - local_current_pose.position.y,
                    cost_map.cells[min_i].x - local_current_pose.position.x);
       head = mod(head + PI, TWO_PI) - PI;
-      // ROS_INFO("Got nearest radius neighbor, poly dist: %f", minDist);
+      if (minDist < 1)
+      {
+        // ROS_INFO("Got nearest radius neighbor, poly dist: %f", minDist);
+        geometry_msgs::Point nn_temp;
+        nn_temp.x = nn_graph_point.p.a;
+        nn_temp.y = nn_graph_point.p.b;
+        std_msgs::ColorRGBA color_temp;
+        color_temp.a = 1;
+        color_temp.b = 1;
+
+        geometry_msgs::Point nn_temp1 = local_current_pose.position;
+        std_msgs::ColorRGBA color_temp1;
+        color_temp1.a = 1;
+        color_temp1.r = 1;
+        nnArray.points.push_back(nn_temp1);
+        nnArray.colors.push_back(color_temp1);
+
+        nnArray.points.push_back(nn_temp);
+        nnArray.colors.push_back(color_temp);
+        // nnArray.points.push_back(nn_temp1);
+        // nnArray.colors.push_back(color_temp1);
+      }
     }
     else
     {
       minDist =
           distance(local_current_pose.position.x, local_current_pose.position.y,
                    nn_graph_point.p.a, nn_graph_point.p.b);
+
+      geometry_msgs::Point nn_temp;
+      nn_temp.x = nn_graph_point.p.a;
+      nn_temp.y = nn_graph_point.p.b;
+      std_msgs::ColorRGBA color_temp;
+      color_temp.a = 1;
+      color_temp.b = 1;
+      color_temp.g = 1;
+
+      geometry_msgs::Point nn_temp1 = local_current_pose.position;
+      std_msgs::ColorRGBA color_temp1;
+      color_temp1.a = 1;
+      color_temp1.r = 1;
+      color_temp1.b = 1;
+      nnArray.points.push_back(nn_temp);
+      nnArray.colors.push_back(color_temp);
+      nnArray.points.push_back(nn_temp1);
+      nnArray.colors.push_back(color_temp1);
       // ROS_INFO("Got nearest neighbor, poly dist: %f", minDist);
     }
 
@@ -828,12 +891,13 @@ namespace mpepc_local_planner
       if (!collision_detected)
       {
         double minDist = min_distance_to_obstacle(sim_pose, &obstacle_heading);
-        if (isLocalOptimize_)
-          ROS_INFO("minDist: %lf", minDist);
+        // if (isLocalOptimize_)
+        // ROS_INFO("minDist: %lf", minDist);
 
         if (minDist <= SAFETY_ZONE)
         {
           // ROS_INFO("Collision Detected");
+          // ROS_INFO("minDist: %lf", minDist);
           collision_detected = true;
           if (isLocalOptimize_)
             traj_marker.color.r = 1.0;
@@ -842,8 +906,8 @@ namespace mpepc_local_planner
       }
       else
       {
-        if (isLocalOptimize_)
-          ROS_INFO("collision!");
+        // if (isLocalOptimize_)
+        ROS_INFO("collision!");
         collision_prob = 1;
       }
 
@@ -878,14 +942,14 @@ namespace mpepc_local_planner
         expected_progress +
         C1 * abs(tf::getYaw(sim_pose.orientation) - gradient_angle);
 
-    // ROS_INFO("expected_collision: %lf, expected_progress: %lf, expected_action: %lf",
-    //          expected_collision, expected_progress, expected_action);
+    ROS_INFO("expected_collision: %lf, expected_progress: %lf, expected_action: %lf",
+             expected_collision, expected_progress, expected_action);
 
     // ROS_INFO("expected_progress: %lf", expected_progress);
 
     // ROS_INFO("expected_action: %lf", expected_action);
 
-    double sumCost = (expected_collision + expected_progress / 50.0 + expected_action);
+    double sumCost = (expected_collision + expected_progress + expected_action);
     if (isLocalOptimize_)
     {
       if (maxTrajCost == -1 || sumCost > maxTrajCost)
@@ -893,9 +957,9 @@ namespace mpepc_local_planner
 
         maxTrajCost = sumCost;
       }
-      ROS_INFO("expected_collision: %lf, expected_progress: %lf, expected_action: %lf",
-               expected_collision, expected_progress / 50.0, expected_action);
-      ROS_INFO("collision prob: %lf", collision_prob);
+      // ROS_INFO("expected_collision: %lf, expected_progress: %lf, expected_action: %lf",
+      //          expected_collision, expected_progress / 50.0, expected_action);
+      // ROS_INFO("collision prob: %lf", collision_prob);
       traj_marker.header.frame_id = costmap_ros_->getGlobalFrameID();
       traj_marker.header.stamp = ros::Time();
       traj_marker.ns = "Mpepc_sample";
